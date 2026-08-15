@@ -4,6 +4,23 @@ A **background job queue** for Baga — apps-roadmap **№5**. Worker pool over
 `chan` of job ids, payloads on disk (persistence + the only shared store
 workers can reach — `go`/`chan` carry only `i64`).
 
+This repository is the package. The compiler and `std` stay in the baga
+language monorepo. Check this tree out as `app-product/queuebaga` there
+(git submodule) so path deps and `-I app-product` keep working.
+
+## Checkout
+
+Inside a baga language clone:
+
+```bash
+git submodule update --init app-product/queuebaga
+# or, first time from a fresh baga tree without the submodule recorded:
+git clone git@github.com:bagalang/queuebaga.git app-product/queuebaga
+```
+
+`sandak.toml` keeps `std = { path = "../../std" }`.
+`tests/queue_test.baga` stays in baga.
+
 ## Design
 
 ```
