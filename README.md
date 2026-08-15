@@ -66,3 +66,7 @@ BAGA=../../baga sandak build
 See [`gaps.md`](gaps.md): no `setenv` (active prefix file), `write_file`
 truncate races (q_wait polls through `""`), chan/i64-only workers, no
 idempotency key yet.
+
+## License
+
+[MIT](LICENSE) — Copyright (c) 2026 Dim Gigov.
