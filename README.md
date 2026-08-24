@@ -42,14 +42,17 @@ until `max_attempts` (retry with backoff).
 fn q_open(prefix, max_attempts) -> Queue !IO !Par
 fn q_start_workers(q, n) -> Queue !IO !Par
 fn q_enqueue(q, payload) -> i64 !IO !Par     // job id
+fn q_enqueue_keyed(q, key, payload) -> i64 !IO !Par  // same key → first id
 fn q_status(q, id) -> str !IO                // pending|running|done|failed
 fn q_result(q, id) -> str !IO
+fn q_attempts(q, id) -> i64 !IO
 fn q_wait(q, id, timeout_ms) -> str !IO !Par !Time
 fn q_process_fn(prefix, id, max, handler) -> i64 !IO  // L5 in-process
 fn q_close(q) -> i64 !Par                    // close work chan
 ```
 
 Paths: `<prefix>.<id>.job|.status|.result|.attempts` (flat — no mkdir).
+Idempotency map: `<prefix>.idemp.<safe-key>` (alnum / `_` / `-` only).
 
 ## Run
 
@@ -64,8 +67,8 @@ BAGA=../../baga sandak build
 ## Honest limits
 
 See [`gaps.md`](gaps.md): no `setenv` (active prefix file), `write_file`
-truncate races (q_wait polls through `""`), chan/i64-only workers, no
-idempotency key yet.
+truncate races (`q_wait` polls through `""`), chan/i64-only workers.
+`q_enqueue_keyed` is file-backed (P1). Reverse / path join use `bufbaga`.
 
 ## License
 

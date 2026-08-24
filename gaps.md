@@ -59,8 +59,15 @@ lsmbaga MVP. queuebaga can migrate off flat prefixes when desired.
 `fn(str) -> str`. Same `fail:` retry convention. `go_bg` workers still
 use the built-in reverse/`fail:` `q_process_one` (chan is i64-only — Q1).
 
+## Q6 — nested concat in reverse / paths — **closed 2026-08-24**
+
+`q_reverse`, `q_path`, `q_key_safe` use `bufbaga` (`buf_push_chr` /
+`buf_push_i64`). Same G1 family as csv/md/tpl.
+
 ## Closed / fine
 
 - `mutex` for id allocation works.
 - `chan_recv2` + close wakes workers cleanly enough for tests.
 - Retry/backoff with `sleep_ms` is expressible.
+- Idempotency key file map (`q_enqueue_keyed`, P1). Empty/unsafe keys
+  fall through to `q_enqueue`. Safe charset: alnum / `_` / `-`.

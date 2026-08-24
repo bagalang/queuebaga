@@ -1,7 +1,7 @@
 # queuebaga — task queue (plan)
 
-Date: 2026-08-04
-Status: P0 done
+Date: 2026-08-24
+Status: P0 done, P1 partial (0.2.0)
 Goal: apps-roadmap **№5** — channels, time, persistence, retry.
 
 ## Phases
@@ -13,10 +13,11 @@ Goal: apps-roadmap **№5** — channels, time, persistence, retry.
 3. Reverse job + `fail:` retry until max attempts.
 4. `q_wait` with timeout; demo + `queue_test`.
 
-### P1
+### P1 — partial (0.2.0)
 
-- Idempotency key file map.
-- `mkdir` / real directories; TCP enqueue API.
+- Idempotency key file map. **Shipped** as `q_enqueue_keyed`.
+- `q_attempts` + `bufbaga` reverse/path join.
+- `mkdir` / real directories; TCP enqueue API — still open.
 - Pluggable job functions (needs L5 function values). **Shipped** as
   in-process `q_process_fn`; workers still use `q_process_one`.
 
@@ -28,5 +29,5 @@ Goal: apps-roadmap **№5** — channels, time, persistence, retry.
 ## Success criteria (P0) — met
 
 1. `sandak build` OK.
-2. `queue_test` — reverse, multi-job, fail/retry.
+2. `queue_test` — reverse, multi-job, fail/retry, keyed enqueue.
 3. Demo prints done/failed results.

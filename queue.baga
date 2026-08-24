@@ -10,6 +10,7 @@
 import "std/os/os.baga"
 import "std/str/str.baga"
 import "std/time/time.baga"
+import "bufbaga/buf.baga"
 
 struct Queue {
     prefix: str,        // e.g. "/tmp/baga_qdemo"
@@ -21,7 +22,12 @@ struct Queue {
 
 fn q_path(prefix: str, id: i64, kind: str) -> str {
     // <prefix>.<id>.<kind>  kind = job|status|result|attempts
-    return concat(concat(concat(concat(prefix, "."), int_to_str(id)), "."), kind)
+    let mut b = buf_from(prefix)
+    b = buf_push_chr(b, 46)
+    b = buf_push_i64(b, id)
+    b = buf_push_chr(b, 46)
+    b = buf_push(b, kind)
+    return buf_str(b)
 }
 
 fn q_write(prefix: str, id: i64, kind: str, data: str) -> i64 !IO {
@@ -33,13 +39,24 @@ fn q_read(prefix: str, id: i64, kind: str) -> str !IO {
 }
 
 fn q_reverse(s: str) -> str {
-    let mut out = ""
+    let mut b = buf_new()
     let mut i = len(s)
     while i > 0 {
         i = i - 1
-        out = concat(out, substr(s, i, i + 1))
+        b = buf_push_chr(b, char_at(s, i))
     }
-    return out
+    return buf_str(b)
+}
+
+fn q_key_safe(s: str) -> str {
+    let mut b = buf_new()
+    for i in 0..len(s) {
+        let c = char_at(s, i)
+        if (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 || c == 45 {
+            b = buf_push_chr(b, c)
+        }
+    }
+    return buf_str(b)
 }
 
 fn q_open(prefix: str, max_attempts: i64) -> Queue !IO !Par {
@@ -58,8 +75,7 @@ fn q_open(prefix: str, max_attempts: i64) -> Queue !IO !Par {
     }
 }
 
-fn q_alloc_id(q: Queue) -> i64 !IO !Par {
-    mutex_lock(q.mu)
+fn q_next_id(q: Queue) -> i64 !IO {
     let path = concat(q.prefix, ".next_id")
     let cur_s = read_file(path)?
     let mut id: i64 = 1
@@ -70,13 +86,17 @@ fn q_alloc_id(q: Queue) -> i64 !IO !Par {
         }
     }
     write_file(path, int_to_str(id + 1))?
+    return id
+}
+
+fn q_alloc_id(q: Queue) -> i64 !IO !Par {
+    mutex_lock(q.mu)
+    let id = q_next_id(q)?
     mutex_unlock(q.mu)
     return id
 }
 
-// Enqueue; returns job id (>0) or -1 on I/O error.
-fn q_enqueue(q: Queue, payload: str) -> i64 !IO !Par {
-    let id = q_alloc_id(q)?
+fn q_put_job(q: Queue, id: i64, payload: str) -> i64 !IO !Par {
     if q_write(q.prefix, id, "job", payload)? != 0 {
         return -1
     }
@@ -87,12 +107,51 @@ fn q_enqueue(q: Queue, payload: str) -> i64 !IO !Par {
     return id
 }
 
+// Enqueue; returns job id (>0) or -1 on I/O error.
+fn q_enqueue(q: Queue, payload: str) -> i64 !IO !Par {
+    let id = q_alloc_id(q)?
+    return q_put_job(q, id, payload)?
+}
+
+// Same payload under `key` returns the first job id (alnum/_/- only).
+fn q_enqueue_keyed(q: Queue, key: str, payload: str) -> i64 !IO !Par {
+    let sk = q_key_safe(key)
+    if sk == "" {
+        return q_enqueue(q, payload)?
+    }
+    let mut ipb = buf_from(q.prefix)
+    ipb = buf_push(ipb, ".idemp.")
+    ipb = buf_push(ipb, sk)
+    let ip = buf_str(ipb)
+    mutex_lock(q.mu)
+    let existing = read_file(ip)?
+    if existing != "" {
+        let id = parse_int(existing)
+        mutex_unlock(q.mu)
+        if id > 0 {
+            return id
+        }
+    }
+    let id = q_next_id(q)?
+    write_file(ip, int_to_str(id))?
+    mutex_unlock(q.mu)
+    return q_put_job(q, id, payload)?
+}
+
 fn q_status(q: Queue, id: i64) -> str !IO {
     return q_read(q.prefix, id, "status")?
 }
 
 fn q_result(q: Queue, id: i64) -> str !IO {
     return q_read(q.prefix, id, "result")?
+}
+
+fn q_attempts(q: Queue, id: i64) -> i64 !IO {
+    let s = q_read(q.prefix, id, "attempts")?
+    if s == "" {
+        return 0
+    }
+    return parse_int(s)
 }
 
 // 0 = done, 1 = final fail, 2 = requeue
