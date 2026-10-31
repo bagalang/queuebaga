@@ -226,10 +226,12 @@ fn q_worker(work: i64) -> i64 !IO !Par {
     let mut running: i64 = 1
     while running == 1 {
         let cell = chan_recv2(work)
-        if cell2_0(cell) == 0 {
+        let ok = cell2_0(cell)
+        let id = cell2_1(cell)
+        cell2_free(cell)
+        if ok == 0 {
             running = 0
         } else {
-            let id = cell2_1(cell)
             let rc = q_process_one(prefix, id, ma)?
             if rc == 2 {
                 sleep_ms(15)
