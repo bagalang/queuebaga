@@ -17,7 +17,9 @@ struct Queue {
     work: i64,          // chan of job ids
     mu: i64,            // mutex for id allocation
     max_attempts: i64,
-    workers: i64
+    workers: i64,
+    // P64: process-local terminal status/result cache (frozen world + wcache)
+    cache_w: i64
 }
 
 fn q_path(prefix: str, id: i64, kind: str) -> str {
@@ -66,12 +68,15 @@ fn q_open(prefix: str, max_attempts: i64) -> Queue !IO !Par {
     if ma < 1 {
         ma = 3
     }
+    let cw = world_new()
+    world_freeze(cw)
     return Queue {
         prefix: prefix,
         work: chan_new(64),
         mu: mutex_new(),
         max_attempts: ma,
-        workers: 0
+        workers: 0,
+        cache_w: cw
     }
 }
 
@@ -139,11 +144,27 @@ fn q_enqueue_keyed(q: Queue, key: str, payload: str) -> i64 !IO !Par {
 }
 
 fn q_status(q: Queue, id: i64) -> str !IO {
-    return q_read(q.prefix, id, "status")?
+    let ck = id * 2
+    if wcache_has(q.cache_w, ck) == 1 {
+        return wcache_get_str(q.cache_w, ck)
+    }
+    let s = q_read(q.prefix, id, "status")?
+    if s == "done" || s == "failed" {
+        wcache_set_str(q.cache_w, ck, s)
+    }
+    return s
 }
 
 fn q_result(q: Queue, id: i64) -> str !IO {
-    return q_read(q.prefix, id, "result")?
+    let ck = id * 2 + 1
+    if wcache_has(q.cache_w, ck) == 1 {
+        return wcache_get_str(q.cache_w, ck)
+    }
+    let r = q_read(q.prefix, id, "result")?
+    if r != "" {
+        wcache_set_str(q.cache_w, ck, r)
+    }
+    return r
 }
 
 fn q_attempts(q: Queue, id: i64) -> i64 !IO {
@@ -252,7 +273,8 @@ fn q_start_workers(q: Queue, n: i64) -> Queue !IO !Par {
     }
     return Queue {
         prefix: q.prefix, work: q.work, mu: q.mu,
-        max_attempts: q.max_attempts, workers: n
+        max_attempts: q.max_attempts, workers: n,
+        cache_w: q.cache_w
     }
 }
 
