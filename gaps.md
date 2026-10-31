@@ -35,8 +35,7 @@ with mutex. (a) is production-honest for durable queues.
 
 **Severity.** Medium for multi-thread file status.
 
-**Verdict.** Write-temp + `rename` when rename exists; or record format
-with length prefix. Logged.
+**Verdict.** CLOSED 2026-10-31 — `write_file_atomic` (temp + unlink/link rename) в std/os; q_write и next_id го ползват.
 
 ## Q4 — ~~no `mkdir`~~ — UNBLOCKED 2026-08-05 (lsmbaga / std/os)
 

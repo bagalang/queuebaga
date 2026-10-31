@@ -33,7 +33,9 @@ fn q_path(prefix: str, id: i64, kind: str) -> str {
 }
 
 fn q_write(prefix: str, id: i64, kind: str, data: str) -> i64 !IO {
-    return write_file(q_path(prefix, id, kind), data)?
+    // Q3 (closed 2026-10-31): atomic write — читящите никога не виждат
+    // междинно състояние от O_TRUNC race.
+    return write_file_atomic(q_path(prefix, id, kind), data)?
 }
 
 fn q_read(prefix: str, id: i64, kind: str) -> str !IO {
@@ -90,7 +92,7 @@ fn q_next_id(q: Queue) -> i64 !IO {
             id = 1
         }
     }
-    write_file(path, int_to_str(id + 1))?
+    write_file_atomic(path, int_to_str(id + 1))?
     return id
 }
 
